@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFC 卡片資訊讀取器</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; }
+        button { padding: 10px 20px; font-size: 16px; margin-bottom: 20px; }
+        pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+
+    <h2>NFC 感應測試</h2>
+    <button id="scanButton">開啟感應並掃描卡片</button>
+    <pre id="log">系統狀態：等待指令...\n</pre>
+
+    <script>
+        const logElement = document.getElementById('log');
+        const writeLog = (msg) => logElement.textContent += msg + '\n';
+
+        document.getElementById('scanButton').addEventListener('click', async () => {
+            writeLog("檢查 NFC 支援度...");
+            
+            if (!("NDEFReader" in window)) {
+                writeLog("錯誤：此瀏覽器不支援 Web NFC (請確認使用 Android Chrome)");
+                return;
+            }
+
+            try {
+                const ndef = new NDEFReader();
+                await ndef.scan();
+                writeLog("NFC 模組已啟動，請將卡片貼近手機背面...");
+
+                ndef.onreading = event => {
+                    writeLog("------------------------");
+                    writeLog("✅ 成功讀取到卡片！");
+                    // 取得卡片的唯一識別碼 (UID)
+                    writeLog(`卡片序號 (Serial Number): ${event.serialNumber}`);
+                    
+                    // 解析卡片內的 NDEF 紀錄
+                    const records = event.message.records;
+                    writeLog(`發現 ${records.length} 筆 NDEF 紀錄`);
+                    
+                    for (const record of records) {
+                        writeLog(`- 紀錄類型: ${record.recordType}`);
+                    }
+                };
+
+                ndef.onreadingerror = () => {
+                    writeLog("⚠️ 讀取失敗，可能是卡片未格式化或加密限制，請重新貼近。");
+                };
+
+            } catch (error) {
+                writeLog(`發生異常: ${error.message}`);
+            }
+        });
+    </script>
+
+</body>
+</html>
