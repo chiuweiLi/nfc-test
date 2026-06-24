@@ -3,57 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFC 卡片資訊讀取器</title>
+    <title>NFC 進階資訊解析器</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; line-height: 1.6; }
-        button { padding: 10px 20px; font-size: 16px; margin-bottom: 20px; }
-        pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; background-color: #f9f9f9;}
+        .btn-group { margin-bottom: 20px; }
+        button { padding: 10px 20px; font-size: 16px; margin-right: 10px; border-radius: 5px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+        button.primary { background: #007bff; color: white; border: none; }
+        pre { background: #1e1e1e; color: #00ff00; padding: 15px; border-radius: 8px; overflow-x: auto; min-height: 200px; font-size: 14px; }
     </style>
 </head>
 <body>
 
-    <h2>NFC 感應測試</h2>
-    <button id="scanButton">開啟感應並掃描卡片</button>
-    <pre id="log">系統狀態：等待指令...\n</pre>
+    <h2>NFC 進階資訊解析</h2>
+    <div class="btn-group">
+        <button id="scanButton" class="primary">📡 開始掃描</button>
+        <button id="clearButton">🗑️ 清除畫面</button>
+    </div>
+    <pre id="log">等待指令...\n</pre>
 
     <script>
         const logElement = document.getElementById('log');
         const writeLog = (msg) => logElement.textContent += msg + '\n';
+        
+        document.getElementById('clearButton').addEventListener('click', () => {
+            logElement.textContent = '畫面已清除。等待指令...\n';
+        });
 
         document.getElementById('scanButton').addEventListener('click', async () => {
-            writeLog("檢查 NFC 支援度...");
-            
-            if (!("NDEFReader" in window)) {
-                writeLog("錯誤：此瀏覽器不支援 Web NFC (請確認使用 Android Chrome)");
-                return;
-            }
-
             try {
                 const ndef = new NDEFReader();
                 await ndef.scan();
-                writeLog("NFC 模組已啟動，請將卡片貼近手機背面...");
+                writeLog("▶ NFC 掃描中... 請貼近卡片");
 
                 ndef.onreading = event => {
-                    writeLog("------------------------");
-                    writeLog("✅ 成功讀取到卡片！");
-                    // 取得卡片的唯一識別碼 (UID)
-                    writeLog(`卡片序號 (Serial Number): ${event.serialNumber}`);
+                    writeLog("\n=======================");
+                    writeLog("✅ 成功讀取卡片！");
+                    writeLog(`🆔 卡片序號 (UID): ${event.serialNumber}`);
                     
-                    // 解析卡片內的 NDEF 紀錄
                     const records = event.message.records;
-                    writeLog(`發現 ${records.length} 筆 NDEF 紀錄`);
+                    writeLog(`📂 發現 ${records.length} 筆 NDEF 資料紀錄`);
                     
-                    for (const record of records) {
-                        writeLog(`- 紀錄類型: ${record.recordType}`);
+                    if (records.length === 0) {
+                        writeLog("ℹ️ 此卡片為空卡，或不包含標準 NDEF 格式資料。");
+                        return;
+                    }
+
+                    // 逐筆解析資料
+                    for (let i = 0; i < records.length; i++) {
+                        const record = records[i];
+                        writeLog(`\n--- 紀錄 [${i + 1}] ---`);
+                        writeLog(`類別: ${record.recordType}`);
+
+                        // 根據不同類型進行解碼
+                        try {
+                            const decoder = new TextDecoder(record.encoding || "utf-8");
+                            if (record.recordType === "text") {
+                                writeLog(`📄 文字內容: ${decoder.decode(record.data)}`);
+                            } else if (record.recordType === "url") {
+                                writeLog(`🔗 網址連結: ${decoder.decode(record.data)}`);
+                            } else if (record.recordType === "mime") {
+                                writeLog(`📦 MIME 類型: ${record.mediaType}`);
+                                writeLog(`資料片段: ${decoder.decode(record.data)}`);
+                            } else {
+                                writeLog(`⚠️ 未知的標準格式，無法直接轉為文字閱讀。`);
+                            }
+                        } catch (decodeErr) {
+                            writeLog(`❌ 解析內容失敗: 格式不符`);
+                        }
                     }
                 };
-
-                ndef.onreadingerror = () => {
-                    writeLog("⚠️ 讀取失敗，可能是卡片未格式化或加密限制，請重新貼近。");
-                };
-
             } catch (error) {
-                writeLog(`發生異常: ${error.message}`);
+                writeLog(`\n❌ 錯誤: ${error.message}`);
             }
         });
     </script>
